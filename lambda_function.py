@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-from openai import OpenAI, api_key
+from openai import OpenAI
 import os
 
 def scrape_erewash_news(base_url):
