@@ -1,0 +1,60 @@
+name: Deploy Lambda to S3 and Update Function
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-west-2
+
+    - name: Login to ECR
+      run: |
+        aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 318874356511.dkr.ecr.eu-west-2.amazonaws.com
+
+    - name: Build Docker image
+      run: |
+        docker build -t 318874356511.dkr.ecr.eu-west-2.amazonaws.com/erewash-rag-copy-writer:latest .
+
+    - name: Push Docker image
+      run: |
+        docker push 318874356511.dkr.ecr.eu-west-2.amazonaws.com/erewash-rag-copy-writer:latest
+        
+    - name: Create deployment package
+      run: |
+        zip -r erewash-rag-copy-writer.zip lambda_function.py articles.json
+        
+    - name: Upload to S3
+      run: |
+        aws s3 cp erewash-rag-copy-writer.zip s3://erewash-rag-server-code/erewash-rag-copy-writer.zip
+        
+    - name: Update Lambda function to use latest image
+      run: |
+        aws lambda update-function-code \
+          --function-name erewash-rag-copy-writer \
+          --image-uri 318874356511.dkr.ecr.eu-west-2.amazonaws.com/erewash-rag-copy-writer:latest \
+          --region eu-west-2 
+          
+    - name: Wait for update to complete
+      run: |
+        aws lambda wait function-updated \
+          --function-name erewash-rag-copy-writer \
+          --region eu-west-2
+          
+    - name: Publish new version
+      run: |
+        aws lambda publish-version \
+          --function-name erewash-rag-copy-writer \
+          --description "Deployed from GitHub Actions" \
+          --region eu-west-2 
