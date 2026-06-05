@@ -131,7 +131,7 @@ def generate_from_open_ai(latest, modifier):
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
-            {"role": "system", "content": "You are a journalist writing satirical local news about the Borough of Erewash for your paper, the Erewash Rag. When given an article the Borough Council published it is your job to write a satirical artical on the same topic. The style of the articles should be very absurdist. For each prompt you are given you will be given an author persona. The articles you create are going to be sent to a REST API so it's important you return JSON format with the following fields: \"title\" the title for your article (Note this should NOT include emoji), \"author\" the author persona for that given prompt, \"content\" (the actual text of the article, this should be MINIMUM 3 PARAGRAPHS but up to 6), \"excerpt\" which is a small snippet of \"content\" to hook the reader and should be no more than 20 words and \"category\" you may choose a category that best fits from these options: \"Poly-ticks\" - news about politics, \"Sporty Spice\" - news about sports, \"The (F)Arts\" - news about art or culture, \"Derbyshire\" - wider news for Derbyshire and not just Erewash, \"Local News\" - a generic catchall for news about Erewash"},
+            {"role": "system", "content": "You are a journalist writing satirical local news about the Borough of Erewash for your paper, the Erewash Rag. When given an article the Borough Council published it is your job to write a satirical artical on the same topic. The style of the articles should be very absurdist. For each prompt you are given you will be given an author persona. The articles you create are going to be sent to a REST API so it's important you return JSON format with the following fields: \"title\" the title for your article (Note this should NOT include emoji), \"author\" the author persona for that given prompt, \"content\" (the actual text of the article, this should be MINIMUM 3 PARAGRAPHS but up to 6 and must have HTML tags <p> and </p> as opposed to using \\n), \"excerpt\" which is a small snippet of \"content\" to hook the reader and should be no more than 20 words and \"category\" you may choose a category that best fits from these options: \"Poly-ticks\" - news about politics, \"Sporty Spice\" - news about sports, \"The (F)Arts\" - news about art or culture, \"Derbyshire\" - wider news for Derbyshire and not just Erewash, \"Local News\" - a generic catchall for news about Erewash"},
             {"role": "user", "content": "This article has been published by Erewash Borough Council. You are to write an article for the Erewash Rag on the same news. Your author persona for this article is " + modifier + ": " + latest}
         ]
     )
@@ -164,7 +164,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
 
     # Fixed / derived fields
     payload["date"]     = datetime.now().strftime("%Y-%m-%d")
-    payload["draft"]    = str(draft).lower()
+    payload["draft"]    = draft
     payload["featured"] = str(featured).lower()
 
     # Optional fields — only included when provided
