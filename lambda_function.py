@@ -184,12 +184,8 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     response = requests.post(api_url, headers=headers, json=payload)
     return response.status_code, response.json()
 
-# Run the scraper
-if __name__ == "__main__":
-
-    # send_article("my content", "my title", "my excerpt", "my sourceUrl", "my imageUrl")
-
-    url = os.environ.get('news_source_url') or get_from_file(7)
+def lambda_handler(event, _context):
+    url = event.get('news_source_url') or os.environ.get('news_source_url') or get_from_file(7)
     stories = scrape_erewash_news(url)
 
     prompt_modifiers = [
@@ -219,3 +215,8 @@ if __name__ == "__main__":
         logger.info("Article sent, HTTP %s", status_code)
 
     logger.info("Done — processed %d stories", len(stories))
+    return {"statusCode": 200, "body": f"Processed {len(stories)} stories"}
+
+
+if __name__ == "__main__":
+    lambda_handler({}, None)
