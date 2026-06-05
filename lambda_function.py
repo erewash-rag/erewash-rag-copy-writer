@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     # send_article("my content", "my title", "my excerpt", "my sourceUrl", "my imageUrl")
 
-    url = "https://www.erewash.gov.uk/news"
+    url = os.environ.get('news_source_url') or get_from_file(7)
     stories = scrape_erewash_news(url)
 
     prompt_modifiers = [
