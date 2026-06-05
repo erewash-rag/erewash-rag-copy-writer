@@ -23,7 +23,7 @@ def generate_and_upload_image(article_title):
 
     openai_client = OpenAI(organization=org_id, project=project_id, api_key=api_key)
 
-    prompt = "Create an absurdist satirical cartoon for a news article with the title " + article_title
+    prompt = "Create an absurdist satirical cartoon (but in a visually simple style) for a news article with the title (do not include this title text in the cartoon): " + article_title
 
     result = openai_client.images.generate(
         model="gpt-image-2",
