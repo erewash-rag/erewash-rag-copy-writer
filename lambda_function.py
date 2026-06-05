@@ -64,12 +64,12 @@ def scrape_erewash_news(base_url):
     news_links = soup.select('h2 a')
     logger.info("Found %d article links", len(news_links))
 
-    article_texts = []
+    articles = []
     for link in news_links:
-        article_texts.append(get_article_text(link, headers))
+        articles.append(get_article_text(link, headers))
 
-    logger.info("Scraped %d articles", len(article_texts))
-    return article_texts
+    logger.info("Scraped %d articles", len(articles))
+    return articles
         
 
 def get_article_text(link, headers):
@@ -84,7 +84,7 @@ def get_article_text(link, headers):
 
     logger.info("Scraping article: %s (%s)", title, full_url)
     article_content = scrape_article_content(full_url, headers)
-    return article_content
+    return article_content, full_url
     
     # Respectful delay between requests
     time.sleep(1)
@@ -182,7 +182,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
         "api-key": os.environ.get('api_key') or get_from_file(3)
     }
     response = requests.post(api_url, headers=headers, json=payload)
-    return response.json()
+    return response.status_code, response.json()
 
 # Run the scraper
 if __name__ == "__main__":
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     ]
 
     logger.info("Processing %d stories", len(stories))
-    for i, story in enumerate(stories, start=1):
+    for i, (story, source_url) in enumerate(stories, start=1):
         logger.info("--- Story %d/%d ---", i, len(stories))
         mod = random.choice(prompt_modifiers)
         article_json = generate_from_open_ai(story, mod)
@@ -215,6 +215,7 @@ if __name__ == "__main__":
             article_title = "Erewash News"
 
         image_url = generate_and_upload_image(article_title)
-        send_article(article_json, image=image_url)
+        status_code, _ = send_article(article_json, image=image_url, source_url=source_url)
+        logger.info("Article sent, HTTP %s", status_code)
 
     logger.info("Done — processed %d stories", len(stories))
