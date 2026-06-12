@@ -124,7 +124,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
 
     print("Article sent, response status: ", response.status_code)
 
-    if response.status_code != 200:
+    if response.status_code != 201:
         print(response.json)
 
     return response.status_code
