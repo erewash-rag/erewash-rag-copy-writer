@@ -7,7 +7,6 @@ import re
 import json
 import logging
 import boto3
-from boto3.dynamodb.conditions import Attr
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -127,27 +126,22 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     return response.status_code, response.json()
 
 def get_all_unused_sources():
-    response = table.scan(
-        FilterExpression=Attr("sourceId").eq("erewash_council_news") & Attr("writtenAbout").eq(False)
-    )
-
-    items = response["Items"]
-
-    return max(
-        items,
-        key=lambda x: x["dateAdded"],
-        default=None
-    )
-
-def mark_source_as_written_about(source_url):
-    table.update_item(
-        Key={
-            "id": "{source_link}"
-        },
-        UpdateExpression="SET writtenAbout = :true",
+    response = client.scan(
+        TableName='sources',
+        FilterExpression='sourceId = :sid AND writtenAbout = :false',
         ExpressionAttributeValues={
-            ":true": True
+            ':sid': {'S': 'erewash_council_news'},
+            ':false': {'BOOL': False}
         }
+    )
+    items = response.get("Items", [])
+    return sorted(items, key=lambda x: x["dateAdded"]["S"], reverse=True)
+
+def mark_source_as_written_about(source_id):
+    table.update_item(
+        Key={"id": source_id},
+        UpdateExpression="SET writtenAbout = :true",
+        ExpressionAttributeValues={":true": True}
     )
 
 def lambda_handler(event, _context):
@@ -162,11 +156,14 @@ def lambda_handler(event, _context):
         "Alice Ashbottom, a poncy middle aged lady who loves womens hour, the WI and says they value a sense of community but all they really do is stir the pot"
     ]
 
-    logger.info("Processing %d stories", len(sources))
-    for i, (source, source_url) in enumerate(sources, start=1):
+    logger.info("Processing %d sources", len(sources))
+    for i, source in enumerate(sources, start=1):
         logger.info("--- Story %d/%d ---", i, len(sources))
         mod = random.choice(prompt_modifiers)
-        article_json = generate_from_open_ai(source.get("content"), mod)
+        content = source["content"]["S"]
+        source_url = source["url"]["S"]
+        source_id = source["id"]["S"]
+        article_json = generate_from_open_ai(content, mod)
 
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
@@ -178,12 +175,12 @@ def lambda_handler(event, _context):
         image_url = generate_and_upload_image(article_title)
         status_code, _ = send_article(article_json, image=image_url, source_url=source_url)
         if status_code == 200:
-            mark_source_as_written_about(source_url)
+            mark_source_as_written_about(source_id)
 
         logger.info("Article sent, HTTP %s", status_code)
 
-    logger.info("Done — processed %d stories", len(sources))
-    return {"statusCode": 200, "body": f"Processed {len(sources)} stories"}
+    logger.info("Done — processed %d sources", len(sources))
+    return {"statusCode": 200, "body": f"Processed {len(sources)} sources"}
 
 
 if __name__ == "__main__":
