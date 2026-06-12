@@ -124,7 +124,10 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
 
     print("Article sent, response status: ", response.status_code)
 
-    return response.status_code, response.json()
+    if response.status_code != 200:
+        print(response.json)
+
+    return response.status_code
 
 def get_all_unused_sources():
     response = client.scan(
@@ -175,7 +178,7 @@ def lambda_handler(event, _context):
         source_url=source["id"]["S"]
         
         status_code = send_article(article_json, image_url, source_url)
-        print("")
+        
         if status_code == 200:
             mark_source_as_written_about(source_url)
             articles_created = articles_created + 1
