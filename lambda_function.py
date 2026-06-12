@@ -1,6 +1,4 @@
 import requests
-from bs4 import BeautifulSoup
-import time
 from openai import OpenAI
 import os
 import random
@@ -9,10 +7,15 @@ import re
 import json
 import logging
 import boto3
+from boto3.dynamodb.conditions import Attr
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+client = boto3.client('dynamodb', region_name='eu-west-2')
+dynamodb = boto3.resource("dynamodb", region_name='eu-west-2')
+table = dynamodb.Table('sources')
 
 def generate_and_upload_image(article_title):
     logger.info("Generating image for: %s", article_title)
@@ -48,67 +51,6 @@ def generate_and_upload_image(article_title):
     logger.info("Image uploaded: %s", url)
     return url
 
-
-def scrape_erewash_news(base_url):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-    }
-
-    logger.info("Fetching news listing: %s", base_url)
-    response = requests.get(base_url, headers=headers)
-    if response.status_code != 200:
-        logger.error("Failed to retrieve news page: HTTP %s", response.status_code)
-        return
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    news_links = soup.select('h2 a')
-    logger.info("Found %d article links", len(news_links))
-
-    articles = []
-    for link in news_links:
-        articles.append(get_article_text(link, headers))
-
-    logger.info("Scraped %d articles", len(articles))
-    return articles
-        
-
-def get_article_text(link, headers):
-    title = link.get_text(strip=True)
-    href = link.get('href')
-    
-    # Ensure the link is a full URL
-    if href.startswith('/'):
-        full_url = f"https://www.erewash.gov.uk{href}"
-    else:
-        full_url = href
-
-    logger.info("Scraping article: %s (%s)", title, full_url)
-    article_content = scrape_article_content(full_url, headers)
-    return article_content, full_url
-    
-    # Respectful delay between requests
-    time.sleep(1)
-
-
-def scrape_article_content(url, headers):
-    try:
-        res = requests.get(url, headers=headers)
-        article_soup = BeautifulSoup(res.text, 'html.parser')
-        
-        # 3. Extract the main text
-        # Most gov sites put the main body in an <article> or a specific <div>
-        content_div = article_soup.find('div', class_='item-page') or article_soup.find('article')
-        
-        if content_div:
-            paragraphs = content_div.find_all('p')
-            full_text = "\n".join([p.get_text(strip=True) for p in paragraphs])
-            logger.debug("Extracted %d paragraphs from %s", len(paragraphs), url)
-            return full_text
-        else:
-            logger.warning("Could not find article body at %s", url)
-
-    except Exception as e:
-        logger.error("Error scraping %s: %s", url, e)
 
 def get_from_file(line_num):
     fp = open("local-creds.txt")
@@ -184,9 +126,32 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     response = requests.post(api_url, headers=headers, json=payload)
     return response.status_code, response.json()
 
+def get_all_unused_sources():
+    response = table.scan(
+        FilterExpression=Attr("sourceId").eq("erewash_council_news") & Attr("writtenAbout").eq(False)
+    )
+
+    items = response["Items"]
+
+    return max(
+        items,
+        key=lambda x: x["dateAdded"],
+        default=None
+    )
+
+def mark_source_as_written_about(source_url):
+    table.update_item(
+        Key={
+            "id": "{source_link}"
+        },
+        UpdateExpression="SET writtenAbout = :true",
+        ExpressionAttributeValues={
+            ":true": True
+        }
+    )
+
 def lambda_handler(event, _context):
-    url = event.get('news_source_url') or os.environ.get('news_source_url') or get_from_file(7)
-    stories = scrape_erewash_news(url)
+    sources = get_all_unused_sources()
 
     prompt_modifiers = [
         "Emma Porridge, the political editor. You have a subtle desire in all your writing to make it sound like Erewash Borough Council are actually an authoritarian dictatorship",
@@ -197,11 +162,11 @@ def lambda_handler(event, _context):
         "Alice Ashbottom, a poncy middle aged lady who loves womens hour, the WI and says they value a sense of community but all they really do is stir the pot"
     ]
 
-    logger.info("Processing %d stories", len(stories))
-    for i, (story, source_url) in enumerate(stories, start=1):
-        logger.info("--- Story %d/%d ---", i, len(stories))
+    logger.info("Processing %d stories", len(sources))
+    for i, (source, source_url) in enumerate(sources, start=1):
+        logger.info("--- Story %d/%d ---", i, len(sources))
         mod = random.choice(prompt_modifiers)
-        article_json = generate_from_open_ai(story, mod)
+        article_json = generate_from_open_ai(source.get("content"), mod)
 
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
@@ -212,10 +177,13 @@ def lambda_handler(event, _context):
 
         image_url = generate_and_upload_image(article_title)
         status_code, _ = send_article(article_json, image=image_url, source_url=source_url)
+        if status_code == 200:
+            mark_source_as_written_about(source_url)
+
         logger.info("Article sent, HTTP %s", status_code)
 
-    logger.info("Done — processed %d stories", len(stories))
-    return {"statusCode": 200, "body": f"Processed {len(stories)} stories"}
+    logger.info("Done — processed %d stories", len(sources))
+    return {"statusCode": 200, "body": f"Processed {len(sources)} stories"}
 
 
 if __name__ == "__main__":
