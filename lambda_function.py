@@ -17,7 +17,7 @@ dynamodb = boto3.resource("dynamodb", region_name='eu-west-2')
 table = dynamodb.Table('sources')
 
 def generate_and_upload_image(article_title):
-    print("Generating image for: %s", article_title)
+    print("Generating image for: ", article_title)
 
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
@@ -33,7 +33,7 @@ def generate_and_upload_image(article_title):
     )
 
     image_bytes = base64.b64decode(result.data[0].b64_json)
-    print("Image generated (%d bytes)", len(image_bytes))
+    print("Image generated (" + len(image_bytes) + " bytes)")
 
     bucket = os.environ.get('s3_image_bucket') or get_from_file(4)
     safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', article_title)[:60]
@@ -42,12 +42,11 @@ def generate_and_upload_image(article_title):
     aws_key = os.environ.get('aws_access_key_id') or get_from_file(5)
     aws_secret = os.environ.get('aws_secret_access_key') or get_from_file(6)
 
-    print("Uploading image to s3://%s/%s", bucket, s3_key)
     s3 = boto3.client('s3', aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
     s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes, ContentType='image/png')
 
     url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
-    print("Image uploaded: %s", url)
+    print("Image uploaded: ", url)
     return url
 
 
@@ -58,7 +57,7 @@ def get_from_file(line_num):
             return line.strip('\n')
 
 def generate_from_open_ai(latest, modifier):
-    print("Generating article with persona: %s", modifier.split(',')[0])
+    print("Generating article with persona: ", modifier.split(',')[0])
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
     api_key = os.environ.get('open_ai_api_key') or get_from_file(2)
@@ -114,8 +113,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     if source_url is not None:
         payload["sourceUrl"] = source_url
 
-    print("Sending article: \"%s\" by %s [%s]", payload["title"], payload["author"], payload["category"])
-    logger.debug("Payload: %s", json.dumps(payload, indent=2, ensure_ascii=False))
+    print("Sending article: " + payload["title"] + " by " + payload["author"])
 
     api_url = "https://k1a2nskxl0.execute-api.eu-west-2.amazonaws.com/prod/articles"
     headers = {
@@ -123,6 +121,9 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
         "api-key": os.environ.get('api_key') or get_from_file(3)
     }
     response = requests.post(api_url, headers=headers, json=payload)
+
+    print("Article sent, response status: ", response.status_code)
+
     return response.status_code, response.json()
 
 def get_all_unused_sources():
@@ -174,6 +175,7 @@ def lambda_handler(event, _context):
         source_url=source["id"]["S"]
         
         status_code = send_article(article_json, image_url, source_url)
+        print("")
         if status_code == 200:
             mark_source_as_written_about(source_url)
             articles_created = articles_created + 1
