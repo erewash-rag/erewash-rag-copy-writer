@@ -137,9 +137,9 @@ def get_all_unused_sources():
     items = response.get("Items", [])
     return sorted(items, key=lambda x: x["dateAdded"]["S"], reverse=True)
 
-def mark_source_as_written_about(source_id):
+def mark_source_as_written_about(source_url):
     table.update_item(
-        Key={"id": source_id},
+        Key={"id": source_url},
         UpdateExpression="SET writtenAbout = :true",
         ExpressionAttributeValues={":true": True}
     )
@@ -156,32 +156,29 @@ def lambda_handler(event, _context):
         "Alice Ashbottom, a poncy middle aged lady who loves womens hour, the WI and says they value a sense of community but all they really do is stir the pot"
     ]
 
-    logger.info("Processing %d sources", len(sources))
-    for i, source in enumerate(sources, start=1):
-        logger.info("--- Story %d/%d ---", i, len(sources))
-        mod = random.choice(prompt_modifiers)
+    articles_created = 0
+
+    for source in sources:
+        modifier = random.choice(prompt_modifiers)
         content = source["content"]["S"]
-        source_url = source["url"]["S"]
-        source_id = source["id"]["S"]
-        article_json = generate_from_open_ai(content, mod)
+
+        article_json = generate_from_open_ai(content, modifier)
 
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
             article_title = json.loads(raw).get("title", "Erewash News")
         except (json.JSONDecodeError, AttributeError):
-            logger.warning("Could not parse article title for story %d, using fallback", i)
-            article_title = "Erewash News"
+            continue
 
         image_url = generate_and_upload_image(article_title)
-        status_code, _ = send_article(article_json, image=image_url, source_url=source_url)
+        source_url=source["id"]["S"]
+        
+        status_code = send_article(article_json, image_url, source_url)
         if status_code == 200:
-            mark_source_as_written_about(source_id)
+            mark_source_as_written_about(source_url)
+            articles_created = articles_created + 1
 
-        logger.info("Article sent, HTTP %s", status_code)
-
-    logger.info("Done — processed %d sources", len(sources))
-    return {"statusCode": 200, "body": f"Processed {len(sources)} sources"}
-
+    return {"statusCode": 200, "body": f"Processed {len(sources)} sources. Created {articles_created} articles"}
 
 if __name__ == "__main__":
     lambda_handler({}, None)
