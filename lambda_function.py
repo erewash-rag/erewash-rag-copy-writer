@@ -92,7 +92,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     except json.JSONDecodeError as e:
         logger.error("Failed to parse LLM response as JSON: %s", e)
         logger.debug("Raw response: %s", data)
-        return
+        return None, None
 
     # Required fields from the LLM
     payload = {
