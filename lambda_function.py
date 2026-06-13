@@ -9,15 +9,15 @@ import logging
 import boto3
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+logger.setLevel(os.environ.get("logging_level", "INFO"))
 
 client = boto3.client('dynamodb', region_name='eu-west-2')
 dynamodb = boto3.resource("dynamodb", region_name='eu-west-2')
 table = dynamodb.Table('sources')
 
 def generate_and_upload_image(article_title):
-    print("Generating image for: ", article_title)
+    logger.debug("Generating image for: ", article_title)
 
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
@@ -33,7 +33,7 @@ def generate_and_upload_image(article_title):
     )
 
     image_bytes = base64.b64decode(result.data[0].b64_json)
-    print("Image generated")
+    logger.debug("Image generated")
 
     bucket = os.environ.get('s3_image_bucket') or get_from_file(4)
     safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', article_title)[:60]
@@ -46,7 +46,7 @@ def generate_and_upload_image(article_title):
     s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes, ContentType='image/png')
 
     url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
-    print("Image uploaded: ", url)
+    logger.debug("Image uploaded: ", url)
     return url
 
 
@@ -57,7 +57,7 @@ def get_from_file(line_num):
             return line.strip('\n')
 
 def generate_from_open_ai(latest, modifier):
-    print("Generating article with persona: ", modifier.split(',')[0])
+    logger.debug("Generating article with persona: ", modifier.split(',')[0])
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
     api_key = os.environ.get('open_ai_api_key') or get_from_file(2)
@@ -76,7 +76,7 @@ def generate_from_open_ai(latest, modifier):
         ]
     )
 
-    print("Article generated successfully")
+    logger.debug("Article generated successfully")
     return completion.choices[0].message.content
 
 def send_article(data, image=None, source_url=None, draft=True, featured=False):
@@ -113,7 +113,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     if source_url is not None:
         payload["sourceUrl"] = source_url
 
-    print("Sending article: " + payload["title"] + " by " + payload["author"])
+    logger.debug("Sending article: " + payload["title"] + " by " + payload["author"])
 
     api_url = "https://k1a2nskxl0.execute-api.eu-west-2.amazonaws.com/prod/articles"
     headers = {
@@ -122,10 +122,10 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     }
     response = requests.post(api_url, headers=headers, json=payload)
 
-    print("Article sent, response status: ", response.status_code)
+    logger.debug("Article sent, response status: ", response.status_code)
 
     if response.status_code != 201:
-        print(response.json)
+        logger.error(response.json)
 
     return response.status_code
 
@@ -183,6 +183,7 @@ def lambda_handler(event, _context):
             mark_source_as_written_about(source_url)
             articles_created = articles_created + 1
 
+    logger.info("Processed %s sources. Created %s articles", len(sources), articles_created)
     return {"statusCode": 200, "body": f"Processed {len(sources)} sources. Created {articles_created} articles"}
 
 if __name__ == "__main__":
