@@ -56,8 +56,8 @@ def get_from_file(line_num):
         if i == line_num:
             return line.strip('\n')
 
-def generate_from_open_ai(latest, modifier):
-    logger.debug("Generating article with persona: %s", modifier.split(',')[0])
+def generate_from_open_ai(source_content, prompt_modifier):
+    logger.debug("Generating article with persona: %s", prompt_modifier.split(',')[0])
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
     api_key = os.environ.get('open_ai_api_key') or get_from_file(2)
@@ -72,7 +72,7 @@ def generate_from_open_ai(latest, modifier):
     model="gpt-3.5-turbo",
     messages=[
             {"role": "system", "content": "You are a journalist writing satirical local news about the Borough of Erewash for your paper, the Erewash Rag. When given an article the Borough Council published it is your job to write a satirical artical on the same topic. The style of the articles should be whimsically absurdist. For each prompt you are given you will be given an author persona. The articles you create are going to be sent to a REST API so it's important you return JSON format with the following fields: \"title\" the title for your article (Note this should NOT include emoji), \"author\" the author persona for that given prompt, \"content\" (the actual text of the article, this should be MINIMUM 4 PARAGRAPHS but you are encouraged to write longer, and must have HTML tags <p> and </p> as opposed to using \\n), \"excerpt\" which is a small snippet of \"content\" to hook the reader and should be no more than 20 words and \"category\" you may choose a category that best fits from these options: \"Poly-ticks\" - news about politics, \"Sporty Spice\" - news about sports or physical activity, \"The (F)Arts\" - news about art or culture, \"Derbyshire\" - wider news for Derbyshire and not just Erewash, \"Local News\" - a generic catchall for news about Erewash"},
-            {"role": "user", "content": "This article has been published by Erewash Borough Council. You are to write an article for the Erewash Rag on the same news. Write from the point of view of this author persona: " + modifier + ": " + latest}
+            {"role": "user", "content": "This article has been published by Erewash Borough Council. You are to write an article for the Erewash Rag on the same news. Write from the point of view of this author persona: " + prompt_modifier + ": " + source_content}
         ]
     )
 
@@ -149,8 +149,15 @@ def mark_source_as_written_about(source_url, source_id):
     )
 
 def lambda_handler(event, _context):
-    sources = get_all_unused_sources("erewash_council_news")
-    sources.extend(get_all_unused_sources("derbyshire_live"))
+
+    source_ids = os.environ.get('source_ids_to_write') or get_from_file(7)
+    list_of_source_ids = source_ids.split(',')
+
+    sources = []
+    for source_id in list_of_source_ids:
+        sources_for_source_id = get_all_unused_sources(source_id)
+        logger.debug("Found %d unwrittenAbout sources for source_id %s", len(sources_for_source_id), source_id)
+        sources.extend(sources_for_source_id)
 
     prompt_modifiers = [
         "Emma Porridge, the political editor. You have a subtle desire in all your writing to make it sound like Erewash Borough Council are actually an authoritarian dictatorship",
@@ -165,9 +172,9 @@ def lambda_handler(event, _context):
 
     for source in sources:
         modifier = random.choice(prompt_modifiers)
-        content = source["content"]["S"]
+        source_content = source["content"]["S"]
 
-        article_json = generate_from_open_ai(content, modifier)
+        article_json = generate_from_open_ai(source_content, modifier)
 
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
