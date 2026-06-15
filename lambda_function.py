@@ -93,6 +93,9 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
         logger.debug("Raw response: %s", data)
         return None, None
 
+    keywords = parsed.get("keywords", [])
+    logger.debug("Keywords from LLM: %s", keywords)
+
     # Required fields from the LLM
     payload = {
         "title":    parsed.get("title", ""),
@@ -100,6 +103,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
         "excerpt":  parsed.get("excerpt", ""),
         "author":   parsed.get("author", ""),
         "category": parsed.get("category", "Local News"),
+        "keywords": keywords,
     }
 
     # Fixed / derived fields
@@ -113,7 +117,8 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     if source_url is not None:
         payload["sourceUrl"] = source_url
 
-    logger.debug("Sending article: %s by %s", payload["title"], payload["author"])
+    logger.debug("Sending article:")
+    logger.debug(payload)
 
     api_url = "https://k1a2nskxl0.execute-api.eu-west-2.amazonaws.com/prod/articles"
     headers = {
@@ -175,9 +180,6 @@ def lambda_handler(event, _context):
         source_content = source["content"]["S"]
 
         article_json = generate_from_open_ai(source_content, modifier)
-
-        logger.debug("Generated JSON:")
-        logger.debug(article_json)
 
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
