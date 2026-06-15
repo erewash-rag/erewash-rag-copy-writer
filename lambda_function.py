@@ -141,9 +141,9 @@ def get_all_unused_sources(source_id):
     items = response.get("Items", [])
     return sorted(items, key=lambda x: x["dateAdded"]["S"], reverse=True)
 
-def mark_source_as_written_about(source_url):
+def mark_source_as_written_about(source_url, source_id):
     table.update_item(
-        Key={"id": source_url},
+        Key={"id": source_url, "sourceId": source_id},
         UpdateExpression="SET writtenAbout = :true",
         ExpressionAttributeValues={":true": True}
     )
@@ -176,12 +176,14 @@ def lambda_handler(event, _context):
             continue
 
         image_url = generate_and_upload_image(article_title)
-        source_url=source["id"]["S"]
+        source_url = source["id"]["S"]
+        source_id = source["sourceId"]["S"]
         
         status_code = send_article(article_json, image_url, source_url)
         
         if status_code == 201:
-            mark_source_as_written_about(source_url)
+            mark_source_as_written_about(source_url, source_id)
+            logger.debug("Article saved for source %s from %s", source_url, source_id)
             articles_created = articles_created + 1
 
     logger.info("Processed %s sources. Created %s articles", len(sources), articles_created)
