@@ -176,6 +176,9 @@ def lambda_handler(event, _context):
 
         article_json = generate_from_open_ai(source_content, modifier)
 
+        logger.debug("Generated JSON:")
+        logger.debug(article_json)
+
         try:
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", article_json.strip())
             article_title = json.loads(raw).get("title", "Erewash News")
