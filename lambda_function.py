@@ -180,7 +180,7 @@ def lambda_handler(event, _context):
         
         status_code = send_article(article_json, image_url, source_url)
         
-        if status_code == 200:
+        if status_code == 201:
             mark_source_as_written_about(source_url)
             articles_created = articles_created + 1
 
