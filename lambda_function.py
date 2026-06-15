@@ -134,7 +134,7 @@ def get_all_unused_sources(source_id):
         TableName='sources',
         FilterExpression='sourceId = :sid AND writtenAbout = :false',
         ExpressionAttributeValues={
-            ':sid': {'S': '{source_id}'},
+            ':sid': {'S': source_id},
             ':false': {'BOOL': False}
         }
     )
@@ -150,7 +150,7 @@ def mark_source_as_written_about(source_url):
 
 def lambda_handler(event, _context):
     sources = get_all_unused_sources("erewash_council_news")
-    sources.append(get_all_unused_sources("derbyshire_live"))
+    sources.extend(get_all_unused_sources("derbyshire_live"))
 
     prompt_modifiers = [
         "Emma Porridge, the political editor. You have a subtle desire in all your writing to make it sound like Erewash Borough Council are actually an authoritarian dictatorship",
