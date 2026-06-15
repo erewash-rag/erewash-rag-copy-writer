@@ -17,7 +17,7 @@ dynamodb = boto3.resource("dynamodb", region_name='eu-west-2')
 table = dynamodb.Table('sources')
 
 def generate_and_upload_image(article_title):
-    logger.debug("Generating image for: ", article_title)
+    logger.debug("Generating image for: %s", article_title)
 
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
@@ -46,7 +46,7 @@ def generate_and_upload_image(article_title):
     s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes, ContentType='image/png')
 
     url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
-    logger.debug("Image uploaded: ", url)
+    logger.debug("Image uploaded: %s", url)
     return url
 
 
@@ -113,7 +113,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     if source_url is not None:
         payload["sourceUrl"] = source_url
 
-    logger.debug("Sending article: " + payload["title"] + " by " + payload["author"])
+    logger.debug("Sending article: %s by %s", payload["title"], payload["author"])
 
     api_url = "https://k1a2nskxl0.execute-api.eu-west-2.amazonaws.com/prod/articles"
     headers = {
@@ -122,7 +122,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     }
     response = requests.post(api_url, headers=headers, json=payload)
 
-    logger.debug("Article sent, response status: ", response.status_code)
+    logger.debug("Article sent, response status: %s", response.status_code)
 
     if response.status_code != 201:
         logger.error(response.json)
