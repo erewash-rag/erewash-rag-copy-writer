@@ -57,7 +57,7 @@ def get_from_file(line_num):
             return line.strip('\n')
 
 def generate_from_open_ai(latest, modifier):
-    logger.debug("Generating article with persona: ", modifier.split(',')[0])
+    logger.debug("Generating article with persona: %s", modifier.split(',')[0])
     org_id = os.environ.get('open_ai_org') or get_from_file(0)
     project_id = os.environ.get('open_ai_project') or get_from_file(1)
     api_key = os.environ.get('open_ai_api_key') or get_from_file(2)
