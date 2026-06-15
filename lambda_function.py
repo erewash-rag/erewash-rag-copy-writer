@@ -103,7 +103,7 @@ def send_article(data, image=None, source_url=None, draft=True, featured=False):
     }
 
     # Fixed / derived fields
-    payload["date"]     = datetime.now().strftime("%Y-%m-%d")
+    payload["date"]     = datetime.now()
     payload["draft"]    = draft
     payload["featured"] = str(featured).lower()
 
