@@ -8,6 +8,8 @@ import json
 import logging
 import boto3
 from datetime import datetime
+from io import BytesIO
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("logging_level", "INFO"))
@@ -33,17 +35,21 @@ def generate_and_upload_image(article_title):
     )
 
     image_bytes = base64.b64decode(result.data[0].b64_json)
+    img = Image.open(BytesIO(image_bytes))
+    buffer = BytesIO()
+    img.save(buffer, format="WEBP", quality=75, method=6)
+    buffer.seek(0)
     logger.debug("Image generated")
 
     bucket = os.environ.get('s3_image_bucket') or get_from_file(4)
     safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', article_title)[:60]
-    s3_key = f"images/{datetime.now().strftime('%Y%m%d%H%M%S')}_{safe_title}.png"
+    s3_key = f"images/{datetime.now().strftime('%Y%m%d%H%M%S')}_{safe_title}.webp"
 
     aws_key = os.environ.get('aws_access_key_id') or get_from_file(5)
     aws_secret = os.environ.get('aws_secret_access_key') or get_from_file(6)
 
     s3 = boto3.client('s3', aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
-    s3.put_object(Bucket=bucket, Key=s3_key, Body=image_bytes, ContentType='image/png')
+    s3.put_object(Bucket=bucket, Key=s3_key, Body=buffer.getvalue(), ContentType='image/webp')
 
     url = f"https://{bucket}.s3.amazonaws.com/{s3_key}"
     logger.debug("Image uploaded: %s", url)
