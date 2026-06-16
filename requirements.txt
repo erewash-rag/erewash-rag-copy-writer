@@ -2,3 +2,4 @@ requests
 bs4
 openai
 boto3
+PIL
