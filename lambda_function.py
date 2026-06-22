@@ -198,7 +198,7 @@ def lambda_handler(event, _context):
         source_url = source["id"]["S"]
         source_id = source["sourceId"]["S"]
 
-        status_code = send_article(article_json, image_url, source_url, os.environ.get('hide_published_articles') or True)
+        status_code = send_article(article_json, image_url, source_url, bool(os.environ.get('hide_published_articles')) or True)
         
         if status_code == 201:
             mark_source_as_written_about(source_url, source_id)
