@@ -159,7 +159,7 @@ def mark_source_as_written_about(source_url, source_id):
         ExpressionAttributeValues={":true": True}
     )
 
-def hide_published_articles():
+def is_hide_published_articles():
     str_env_var = os.environ.get("hide_published_articles")
     return not (str_env_var == "False" or str_env_var == "false")
 
@@ -185,7 +185,7 @@ def lambda_handler(event, _context):
 
     articles_created = 0
 
-    hide_published_articles = hide_published_articles()
+    hide_published_articles = is_hide_published_articles()
 
     logger.debug("hide_published_articles = %r", hide_published_articles)
 
