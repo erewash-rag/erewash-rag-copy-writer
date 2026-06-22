@@ -159,6 +159,10 @@ def mark_source_as_written_about(source_url, source_id):
         ExpressionAttributeValues={":true": True}
     )
 
+def hide_published_articles():
+    str_env_var = os.environ.get("hide_published_articles")
+    return not (str_env_var == "False" or str_env_var == "false")
+
 def lambda_handler(event, _context):
 
     source_ids = os.environ.get('source_ids_to_write') or get_from_file(7)
@@ -181,6 +185,10 @@ def lambda_handler(event, _context):
 
     articles_created = 0
 
+    hide_published_articles = hide_published_articles()
+
+    logger.debug("hide_published_articles = %r", hide_published_articles)
+
     for source in sources:
         modifier = random.choice(prompt_modifiers)
         source_content = source["content"]["S"]
@@ -198,7 +206,7 @@ def lambda_handler(event, _context):
         source_url = source["id"]["S"]
         source_id = source["sourceId"]["S"]
 
-        status_code = send_article(article_json, image_url, source_url, bool(os.environ.get('hide_published_articles')) or True)
+        status_code = send_article(article_json, image_url, source_url, hide_published_articles)
         
         if status_code == 201:
             mark_source_as_written_about(source_url, source_id)
